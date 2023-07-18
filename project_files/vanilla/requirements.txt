@@ -1,7 +1,0 @@
-# requirements.txt
-
-ml-starter
-ml-pretrained
-numpy
-scipy
-torch>=2.0.0

@@ -18,7 +18,7 @@ import torch.nn.functional as F
 import torchvision
 from torch import Tensor
 
-from project.models.resnet import ResNetModel
+from image_gen.models.resnet import ResNetModel
 
 CLASS_TO_IDX = {
     "airplane": 0,
