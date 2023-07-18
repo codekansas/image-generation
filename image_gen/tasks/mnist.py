@@ -12,12 +12,11 @@ implement the following methods:
 from dataclasses import dataclass
 
 import ml.api as ml
-import PIL.Image
 import torch
 import torch.nn.functional as F
 import torchvision.transforms.functional as V
 from torch import Tensor
-from torch.utils.data.dataset import Dataset
+from torch.utils.data.dataset import Dataset, TensorDataset
 from torchvision.datasets import MNIST
 
 from image_gen.models.unet import UNetModel
@@ -31,13 +30,9 @@ class MnistTaskConfig(ml.SupervisedLearningTaskConfig):
 # These types are defined here so that they can be used consistently
 # throughout the task and only changed in one location.
 Model = UNetModel
-Batch = tuple[Tensor, Tensor]
+Batch = tuple[Tensor, ...]
 Output = tuple[Tensor, Tensor]
 Loss = Tensor
-
-
-def pad_images(x: PIL.Image.Image) -> PIL.Image.Image:
-    return V.pad(x, padding=[2, 2])
 
 
 @ml.register_task("mnist", MnistTaskConfig)
@@ -49,15 +44,14 @@ class MnistTask(ml.SupervisedLearningTask[MnistTaskConfig, Model, Batch, Output,
         self.diff = ml.GaussianDiffusion(betas)
 
     def run_model(self, model: Model, batch: Batch, state: ml.State) -> Output:
-        images, _ = batch
-        images = (images - images.mean()) / images.std()
+        (images,) = batch
         times = self.diff.sample_random_times(images.shape[0], device=images.device)
         q_sample, noise = self.diff.q_sample(images, times)
         pred_noise = model(q_sample, times)
         return pred_noise, noise
 
     def compute_loss(self, model: Model, batch: Batch, state: ml.State, output: Output) -> Loss:
-        (images, _), (pred_noise, noise) = batch, output
+        (images,), (pred_noise, noise) = batch, output
         loss = F.mse_loss(pred_noise, noise)
 
         def model_sample(q_sample: Tensor, t: Tensor) -> Tensor:
@@ -65,20 +59,28 @@ class MnistTask(ml.SupervisedLearningTask[MnistTaskConfig, Model, Batch, Output,
             return x.clamp(-1.0, 1.0)
 
         if state.phase != "train":
-            init_noise = torch.randn_like(images)
+            max_images = 9
+            init_noise = torch.randn_like(images[:max_images])
             generated = self.diff.p_sample_loop(model_sample, init_noise)
-            self.logger.log_images("generated", generated[-1], max_images=9, sep=2)
+            self.logger.log_images("generated", generated[-1], max_images=max_images, sep=2)
+            single_generation = torch.stack([g[0] for g in generated])
+            self.logger.log_images("generated_single", single_generation, max_images=max_images, sep=2,)
 
         return loss
 
-    def get_dataset(self, phase: ml.Phase) -> Dataset:
+    def get_dataset(self, phase: ml.Phase) -> Dataset[tuple[Tensor, ...]]:
         root_dir = ml.get_data_dir() / "mnist"
-        return MNIST(
+        mnist = MNIST(
             root=root_dir,
             train=phase == "train",
             download=not root_dir.exists(),
-            transform=pad_images,
         )
+
+        data = mnist.data.float()
+        data = V.pad(data, [2, 2])
+        data = (data - 127.5) / 127.5
+        data = data.unsqueeze(1)
+        return TensorDataset(data)
 
 
 if __name__ == "__main__":

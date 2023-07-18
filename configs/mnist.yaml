@@ -6,16 +6,16 @@ model:
 
 task:
   name: mnist
-  max_steps: 10_000
+  max_steps: 2_000
   train_dl:
-    batch_size: 16
+    batch_size: 512
 
 optimizer:
   name: adam
-  lr: 3e-4
+  lr: 0.001
 
 lr_scheduler:
-  name: linear
+  name: cosine_decay
 
 trainer:
   name: sl
