@@ -24,7 +24,7 @@ from image_gen.models.unet import UNetModel
 
 @dataclass
 class MnistTaskConfig(ml.SupervisedLearningTaskConfig):
-    num_beta_steps: int = ml.conf_field(100, help="Number of beta steps")
+    num_beta_steps: int = ml.conf_field(500, help="Number of beta steps")
 
 
 # These types are defined here so that they can be used consistently

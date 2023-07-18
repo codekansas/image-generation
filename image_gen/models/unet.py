@@ -1,8 +1,6 @@
-"""Defines a template mode.
+"""Defines a UNet model for diffusion image generation.
 
-To use this, change the key from ``"template"`` to whatever your project
-is called. Next, just override the ``forward`` model to whatever signature
-your task expects, and you're good to go!
+This was largely taken from ``here <https://github.com/tonyduan/diffusion)>``_.
 """
 
 import math
