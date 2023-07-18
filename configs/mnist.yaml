@@ -1,22 +1,27 @@
 model:
-  name: resnet18
-  num_classes: 10
+  name: unet
+  in_dim: 1
+  embed_dim: 128
+  dim_scales: [1, 2, 4, 8]
 
 task:
-  name: image_demo
-  max_steps: 100_000
+  name: mnist
+  max_steps: 10_000
   train_dl:
     batch_size: 16
 
 optimizer:
-  name: adamw
+  name: adam
+  lr: 3e-4
 
 lr_scheduler:
   name: linear
 
 trainer:
   name: sl
-  batches_per_step: 4
+  compiler:
+    model: false
+    func: false
 
 logger:
   - name: stdout

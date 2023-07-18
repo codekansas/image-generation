@@ -1,7 +1,7 @@
 # requirements.txt
 
+einops
 ml-starter
-ml-pretrained
 numpy
 scipy
 torch>=2.0.0
