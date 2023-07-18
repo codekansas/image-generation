@@ -36,7 +36,7 @@ Output = tuple[Tensor, Tensor]
 Loss = Tensor
 
 
-def pad_images(x: PIL.Image.Image) -> PIL.Image:
+def pad_images(x: PIL.Image.Image) -> PIL.Image.Image:
     return V.pad(x, padding=[2, 2])
 
 
