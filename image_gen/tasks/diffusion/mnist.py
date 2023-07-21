@@ -19,7 +19,7 @@ from torch import Tensor
 from torch.utils.data.dataset import Dataset, TensorDataset
 from torchvision.datasets import MNIST
 
-from image_gen.models.unet import UNetModel
+from image_gen.models.diffusion.unet import UNetModel
 
 
 @dataclass
@@ -35,7 +35,7 @@ Output = tuple[Tensor, Tensor]
 Loss = Tensor
 
 
-@ml.register_task("mnist", MnistTaskConfig)
+@ml.register_task("mnist-diffusion", MnistTaskConfig)
 class MnistTask(ml.SupervisedLearningTask[MnistTaskConfig, Model, Batch, Output, Loss]):
     def __init__(self, config: MnistTaskConfig) -> None:
         super().__init__(config)

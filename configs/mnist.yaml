@@ -1,11 +1,11 @@
 model:
-  name: unet
+  name: unet-diffusion
   in_dim: 1
   embed_dim: 128
   dim_scales: [1, 2, 4, 8]
 
 task:
-  name: mnist
+  name: mnist-diffusion
   max_steps: 2_000
   train_dl:
     batch_size: 512

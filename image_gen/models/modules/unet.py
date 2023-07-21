@@ -1,17 +1,18 @@
-"""Defines a UNet model for diffusion image generation.
+"""Defines a generic UNet model.
 
-This was largely taken from ``here <https://github.com/tonyduan/diffusion)>``_.
+This was largely adapted from ``here <https://github.com/tonyduan/diffusion)>``_.
+
+This UNet model has an optional parameter ``use_time`` that can be set to
+``True`` for time-dependent tasks such as diffusion and ``False`` for
+time-independent tasks such as GANs.
 """
 
 import math
-from dataclasses import dataclass
-from typing import Sequence
+from typing import Optional, Sequence
 
-import ml.api as ml
 import torch
 import torch.nn.functional as F
 from einops import rearrange
-from omegaconf import MISSING
 from torch import Tensor, nn
 
 
@@ -77,16 +78,20 @@ class FFN(nn.Module):
 
 
 class BasicBlock(nn.Module):
-    def __init__(self, in_c: int, out_c: int, time_c: int) -> None:
+    def __init__(self, in_c: int, out_c: int, time_c: int, use_time: bool) -> None:
         super().__init__()
         self.conv1 = nn.Conv2d(in_c, out_c, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(out_c)
         self.conv2 = nn.Conv2d(out_c, out_c, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(out_c)
-        self.mlp_time = nn.Sequential(
-            nn.Linear(time_c, time_c),
-            nn.ReLU(),
-            nn.Linear(time_c, out_c),
+        self.mlp_time = (
+            nn.Sequential(
+                nn.Linear(time_c, time_c),
+                nn.ReLU(),
+                nn.Linear(time_c, out_c),
+            )
+            if use_time
+            else None
         )
 
         self.shortcut = (
@@ -98,10 +103,15 @@ class BasicBlock(nn.Module):
             )
         )
 
-    def forward(self, x: Tensor, t: Tensor) -> Tensor:
+    def forward(self, x: Tensor, t: Optional[Tensor]) -> Tensor:
         out = self.conv1(x)
         out = self.bn1(out)
-        out = F.relu(out + unsqueeze_as(self.mlp_time(t), x))
+        if t is not None:
+            assert self.mlp_time is not None, "Time was provided but time embedding is None"
+            out = out + unsqueeze_as(self.mlp_time(t), x)
+        else:
+            assert self.mlp_time is None, "Time embedding is not None but no time was provided"
+        out = F.relu(out)
         out = self.conv2(out)
         out = self.bn2(out)
         out = F.relu(out + self.shortcut(x))
@@ -134,11 +144,11 @@ class SelfAttention2d(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, in_dim: int, embed_dim: int, dim_scales: Sequence[int]) -> None:
+    def __init__(self, in_dim: int, embed_dim: int, dim_scales: Sequence[int], use_time: bool) -> None:
         super().__init__()
 
         self.init_embed = nn.Conv2d(in_dim, embed_dim, 1)
-        self.time_embed = PositionalEmbedding(embed_dim)
+        self.time_embed = PositionalEmbedding(embed_dim) if use_time else None
 
         self.down_blocks = nn.ModuleList()
         self.up_blocks = nn.ModuleList()
@@ -150,8 +160,8 @@ class UNet(nn.Module):
             self.down_blocks.extend(
                 nn.ModuleList(
                     [
-                        BasicBlock(in_c, in_c, embed_dim),
-                        BasicBlock(in_c, in_c, embed_dim),
+                        BasicBlock(in_c, in_c, embed_dim, use_time),
+                        BasicBlock(in_c, in_c, embed_dim, use_time),
                         nn.Conv2d(in_c, out_c, 3, 2, 1) if not is_last else nn.Conv2d(in_c, out_c, 1),
                     ]
                 )
@@ -162,8 +172,8 @@ class UNet(nn.Module):
             self.up_blocks.extend(
                 nn.ModuleList(
                     [
-                        BasicBlock(in_c + skip_c, in_c, embed_dim),
-                        BasicBlock(in_c + skip_c, in_c, embed_dim),
+                        BasicBlock(in_c + skip_c, in_c, embed_dim, use_time),
+                        BasicBlock(in_c + skip_c, in_c, embed_dim, use_time),
                         nn.ConvTranspose2d(in_c, out_c, (2, 2), 2) if not is_last else nn.Conv2d(in_c, out_c, 1),
                     ]
                 )
@@ -171,69 +181,51 @@ class UNet(nn.Module):
 
         self.mid_blocks = nn.ModuleList(
             [
-                BasicBlock(all_dims[-1], all_dims[-1], embed_dim),
+                BasicBlock(all_dims[-1], all_dims[-1], embed_dim, use_time),
                 SelfAttention2d(all_dims[-1]),
-                BasicBlock(all_dims[-1], all_dims[-1], embed_dim),
+                BasicBlock(all_dims[-1], all_dims[-1], embed_dim, use_time),
             ]
         )
 
         self.out_blocks = nn.ModuleList(
             [
-                BasicBlock(embed_dim, embed_dim, embed_dim),
+                BasicBlock(embed_dim, embed_dim, embed_dim, use_time),
                 nn.Conv2d(embed_dim, in_dim, 1, bias=True),
             ]
         )
 
-    def forward(self, x: Tensor, t: Tensor) -> Tensor:
+    def forward(self, x: Tensor, t: Optional[Tensor] = None) -> Tensor:
         x = self.init_embed(x)
-        t = self.time_embed(t)
+        if t is None:
+            assert self.time_embed is None, "Time embedding is not None but no time was provided"
+        else:
+            assert self.time_embed is not None, "Time was provided but time embedding is None"
+            t = self.time_embed(t)
         skip_conns = []
         residual = x.clone()
 
         for block in self.down_blocks:
             if isinstance(block, BasicBlock):
-                x = block(x, t)
+                x = block.forward(x, t)
                 skip_conns.append(x)
             else:
                 x = block(x)
         for block in self.mid_blocks:
             if isinstance(block, BasicBlock):
-                x = block(x, t)
+                x = block.forward(x, t)
             else:
-                x = block(x)
+                x = block.forward(x)
         for block in self.up_blocks:
             if isinstance(block, BasicBlock):
                 x = torch.cat((x, skip_conns.pop()), dim=1)
-                x = block(x, t)
+                x = block.forward(x, t)
             else:
-                x = block(x)
+                x = block.forward(x)
 
         x = x + residual
         for block in self.out_blocks:
             if isinstance(block, BasicBlock):
-                x = block(x, t)
+                x = block.forward(x, t)
             else:
                 x = block(x)
         return x
-
-
-@dataclass
-class UNetModelConfig(ml.BaseModelConfig):
-    in_dim: int = ml.conf_field(MISSING, help="Number of input dimensions")
-    embed_dim: int = ml.conf_field(MISSING, help="Embedding dimension")
-    dim_scales: list[int] = ml.conf_field(MISSING, help="List of dimension scales")
-
-
-@ml.register_model("unet", UNetModelConfig)
-class UNetModel(ml.BaseModel[UNetModelConfig]):
-    def __init__(self, config: UNetModelConfig) -> None:
-        super().__init__(config)
-
-        self.model = UNet(
-            in_dim=config.in_dim,
-            embed_dim=config.embed_dim,
-            dim_scales=config.dim_scales,
-        )
-
-    def forward(self, x: Tensor, t: Tensor) -> Tensor:
-        return self.model(x, t)
