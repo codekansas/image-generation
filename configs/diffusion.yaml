@@ -17,7 +17,7 @@ lr_scheduler:
 trainer:
   name: sl
   validation:
-    valid_every_n_seconds: 30
+    valid_every_n_steps: 250
 
 logger:
   - name: stdout
