@@ -51,10 +51,9 @@ class DiscriminatorModel(ml.BaseModel[DiscriminatorModelConfig]):
         super().__init__(config)
 
         self.model = nn.Sequential(
-            *(
-                cbr(config.in_dim if i == 0 else config.embed_dim, config.embed_dim, 2, 2)
-                for i in range(config.num_layers)
-            ),
+            cbr(config.in_dim, config.embed_dim, 2, 2),
+            cbr(config.embed_dim, config.embed_dim, 2, 2),
+            cbr(config.embed_dim, config.embed_dim, 3, 1),
             nn.Conv2d(config.embed_dim, 1, 1),
         )
 
