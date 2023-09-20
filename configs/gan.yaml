@@ -7,7 +7,7 @@ model:
 
 task:
   name: gan
-  max_steps: 2_000
+  max_steps: 5_000
   train_dl:
     batch_size: 32
 
@@ -21,7 +21,7 @@ lr_scheduler:
 trainer:
   name: gan
   validation:
-    valid_every_n_seconds: 30
+    valid_every_n_steps: 250
 
 logger:
   - name: stdout
