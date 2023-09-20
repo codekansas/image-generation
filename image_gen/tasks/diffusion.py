@@ -1,13 +1,4 @@
-"""Defines a simple supervised learning template task.
-
-This task is meant to be used as a template for creating new tasks. Just
-change the key from ``template`` to whatever you want to name your task, and
-implement the following methods:
-
-- :meth:`run_model`
-- :meth:`compute_loss`
-- :meth:`get_dataset`
-"""
+"""Defines a task for training a diffusion model on MNIST."""
 
 from dataclasses import dataclass
 
@@ -19,25 +10,25 @@ from torch import Tensor
 from torch.utils.data.dataset import Dataset, TensorDataset
 from torchvision.datasets import MNIST
 
-from image_gen.models.diffusion.unet import UNetModel
+from image_gen.models.diffusion import DiffusionModel
 
 
 @dataclass
-class MnistTaskConfig(ml.SupervisedLearningTaskConfig):
+class DiffusionTaskConfig(ml.SupervisedLearningTaskConfig):
     num_beta_steps: int = ml.conf_field(500, help="Number of beta steps")
 
 
 # These types are defined here so that they can be used consistently
 # throughout the task and only changed in one location.
-Model = UNetModel
+Model = DiffusionModel
 Batch = tuple[Tensor, ...]
 Output = tuple[Tensor, Tensor]
 Loss = Tensor
 
 
-@ml.register_task("mnist-diffusion", MnistTaskConfig)
-class MnistTask(ml.SupervisedLearningTask[MnistTaskConfig, Model, Batch, Output, Loss]):
-    def __init__(self, config: MnistTaskConfig) -> None:
+@ml.register_task("diffusion", DiffusionTaskConfig)
+class DiffusionTask(ml.SupervisedLearningTask[DiffusionTaskConfig, Model, Batch, Output, Loss]):
+    def __init__(self, config: DiffusionTaskConfig) -> None:
         super().__init__(config)
 
         betas = ml.get_diffusion_beta_schedule("linear", config.num_beta_steps, dtype=torch.float32)
@@ -64,7 +55,12 @@ class MnistTask(ml.SupervisedLearningTask[MnistTaskConfig, Model, Batch, Output,
             generated = self.diff.p_sample_loop(model_sample, init_noise)
             self.logger.log_images("generated", generated[-1], max_images=max_images, sep=2)
             single_generation = torch.stack([g[0] for g in generated])
-            self.logger.log_images("generated_single", single_generation, max_images=max_images, sep=2,)
+            self.logger.log_images(
+                "generated_single",
+                single_generation,
+                max_images=max_images,
+                sep=2,
+            )
 
         return loss
 
@@ -81,8 +77,3 @@ class MnistTask(ml.SupervisedLearningTask[MnistTaskConfig, Model, Batch, Output,
         data = (data - 127.5) / 127.5
         data = data.unsqueeze(1)
         return TensorDataset(data)
-
-
-if __name__ == "__main__":
-    # python -m image_gen.tasks.mnist
-    ml.test_task(MnistTask(MnistTaskConfig()))

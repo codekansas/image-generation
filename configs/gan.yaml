@@ -1,0 +1,29 @@
+model:
+  name: gan
+  generator:
+    name: generator
+  discriminator:
+    name: discriminator
+
+task:
+  name: gan
+  max_steps: 2_000
+  train_dl:
+    batch_size: 512
+
+optimizer:
+  name: adam
+  lr: 0.001
+
+lr_scheduler:
+  name: cosine_decay
+
+trainer:
+  name: gan
+
+logger:
+  - name: stdout
+  - name: tensorboard
+
+launcher:
+  name: mp

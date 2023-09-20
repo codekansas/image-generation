@@ -1,11 +1,8 @@
 model:
-  name: unet-diffusion
-  in_dim: 1
-  embed_dim: 128
-  dim_scales: [1, 2, 4, 8]
+  name: diffusion
 
 task:
-  name: mnist-diffusion
+  name: diffusion
   max_steps: 2_000
   train_dl:
     batch_size: 512
@@ -19,9 +16,8 @@ lr_scheduler:
 
 trainer:
   name: sl
-  compiler:
-    model: false
-    func: false
+  validation:
+    valid_every_n_seconds: 30
 
 logger:
   - name: stdout
