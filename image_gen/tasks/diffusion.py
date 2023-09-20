@@ -4,7 +4,6 @@ from dataclasses import dataclass
 
 import ml.api as ml
 import torch
-import torch.nn.functional as F
 import torchvision.transforms.functional as V
 from torch import Tensor
 from torch.utils.data.dataset import Dataset, TensorDataset
@@ -22,7 +21,7 @@ class DiffusionTaskConfig(ml.SupervisedLearningTaskConfig):
 # throughout the task and only changed in one location.
 Model = DiffusionModel
 Batch = tuple[Tensor, ...]
-Output = tuple[Tensor, Tensor]
+Output = Tensor
 Loss = Tensor
 
 
@@ -31,36 +30,23 @@ class DiffusionTask(ml.SupervisedLearningTask[DiffusionTaskConfig, Model, Batch,
     def __init__(self, config: DiffusionTaskConfig) -> None:
         super().__init__(config)
 
-        betas = ml.get_diffusion_beta_schedule("linear", config.num_beta_steps, dtype=torch.float32)
+        betas = ml.get_diffusion_beta_schedule("cosine", config.num_beta_steps, dtype=torch.float32)
         self.diff = ml.GaussianDiffusion(betas)
 
     def run_model(self, model: Model, batch: Batch, state: ml.State) -> Output:
         (images,) = batch
-        times = self.diff.sample_random_times(images.shape[0], device=images.device)
-        q_sample, noise = self.diff.q_sample(images, times)
-        pred_noise = model(q_sample, times)
-        return pred_noise, noise
+        return self.diff.loss(images, model)
 
     def compute_loss(self, model: Model, batch: Batch, state: ml.State, output: Output) -> Loss:
-        (images,), (pred_noise, noise) = batch, output
-        loss = F.mse_loss(pred_noise, noise)
-
-        def model_sample(q_sample: Tensor, t: Tensor) -> Tensor:
-            x = model.forward(q_sample, t)
-            return x.clamp(-1.0, 1.0)
+        loss = output
 
         if state.phase != "train":
+            (images,) = batch
             max_images = 9
-            init_noise = torch.randn_like(images[:max_images])
-            generated = self.diff.p_sample_loop(model_sample, init_noise)
-            self.logger.log_images("generated", generated[-1], max_images=max_images, sep=2)
-            single_generation = torch.stack([g[0] for g in generated])
-            self.logger.log_images(
-                "generated_single",
-                single_generation,
-                max_images=max_images,
-                sep=2,
-            )
+            generated = self.diff.sample(model, images[:max_images].shape, images.device)
+            self.logger.log_images("generated", generated[0], max_images=max_images, sep=2)
+            single_generation = generated[:, 0]
+            self.logger.log_images("generated_single", single_generation, max_images=max_images, sep=2)
 
         return loss
 

@@ -1,7 +1,4 @@
-"""Defines a model for image generation with diffusion.
-
-This was largely taken from ``here <https://github.com/tonyduan/diffusion)>``_.
-"""
+"""Defines a model for image generation with diffusion."""
 
 from dataclasses import dataclass
 
