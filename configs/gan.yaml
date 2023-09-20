@@ -9,7 +9,7 @@ task:
   name: gan
   max_steps: 2_000
   train_dl:
-    batch_size: 512
+    batch_size: 32
 
 optimizer:
   name: adam
@@ -20,6 +20,8 @@ lr_scheduler:
 
 trainer:
   name: gan
+  validation:
+    valid_every_n_seconds: 30
 
 logger:
   - name: stdout

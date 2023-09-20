@@ -6,7 +6,7 @@ This was largely taken from ``here <https://github.com/tonyduan/diffusion)>``_.
 from dataclasses import dataclass
 
 import ml.api as ml
-from omegaconf import MISSING
+import torch
 from torch import Tensor
 
 
@@ -30,4 +30,4 @@ class DiffusionModel(ml.BaseModel[DiffusionModelConfig]):
         )
 
     def forward(self, x: Tensor, t: Tensor) -> Tensor:
-        return self.model(x, t)
+        return torch.tanh(self.model(x, t))

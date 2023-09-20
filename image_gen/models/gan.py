@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 import ml.api as ml
-from omegaconf import MISSING
+import torch
 from torch import Tensor, nn
 
 
@@ -27,7 +27,7 @@ class GeneratorModel(ml.BaseModel[GeneratorModelConfig]):
         )
 
     def forward(self, x: Tensor) -> Tensor:
-        return self.model(x)
+        return torch.tanh(self.model(x))
 
 
 @dataclass

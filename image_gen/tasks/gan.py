@@ -3,16 +3,14 @@
 from dataclasses import dataclass
 
 import ml.api as ml
-from ml.core.state import State
 import torch
-from torch._tensor import Tensor
 import torch.nn.functional as F
 import torchvision.transforms.functional as V
 from torch import Tensor
 from torch.utils.data.dataset import Dataset, TensorDataset
 from torchvision.datasets import MNIST
 
-from image_gen.models.gan import GeneratorModel, DiscriminatorModel
+from image_gen.models.gan import DiscriminatorModel, GeneratorModel
 
 
 @dataclass
@@ -22,8 +20,6 @@ class GANTaskConfig(ml.GenerativeAdversarialNetworkTaskConfig):
 
 # These types are defined here so that they can be used consistently
 # throughout the task and only changed in one location.
-GeneratorModel = GeneratorModel
-DiscriminatorModel = DiscriminatorModel
 Batch = tuple[Tensor, ...]
 GeneratorOutput = Tensor
 DiscriminatorOutput = tuple[Tensor, Tensor]
@@ -44,7 +40,8 @@ class GANTask(
     def run_generator(self, generator: GeneratorModel, batch: Batch, state: ml.State) -> GeneratorOutput:
         (images,) = batch
         noise = torch.randn_like(images)
-        return generator(noise)
+        gen_images = generator(noise)
+        return gen_images
 
     def run_discriminator(
         self,
